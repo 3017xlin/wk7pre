@@ -1,0 +1,74 @@
+
+<h2 class="sr-only">4-step visualization of SDF-binned K-means adaptive tokenization around 4 HDB buildings</h2>
+<style>
+.sn{display:flex;align-items:center;gap:12px;margin:10px 0 0}
+.sd{width:10px;height:10px;border-radius:50%;border:0.5px solid var(--color-border-secondary);background:transparent;cursor:pointer;padding:0;transition:background .2s}
+.sd.on{background:var(--color-text-primary)}
+#stitle{font-size:15px;font-weight:500;color:var(--color-text-primary);margin:10px 0 2px}
+#sdesc{font-size:13px;color:var(--color-text-secondary);margin:0;min-height:52px;line-height:1.6}
+</style>
+<canvas id="cv" width="600" height="420" style="width:100%;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary)"></canvas>
+<div class="sn">
+<button onclick="go(-1)">← Back</button>
+<div style="flex:1;display:flex;gap:8px;justify-content:center" id="dots"></div>
+<button onclick="go(1)">Next →</button>
+</div>
+<div id="stitle"></div>
+<div id="sdesc"></div>
+<script>
+const cv=document.getElementById('cv'),cx=cv.getContext('2d'),W=600,H=420;
+const dk=matchMedia('(prefers-color-scheme:dark)').matches;
+const BLDFILL=dk?'#38382f':'#3a3a35';
+const BLDSTK=dk?'#555':'#222';
+const PTCOL=dk?'rgba(160,155,145,0.35)':'rgba(80,78,72,0.22)';
+const TXTCOL=dk?'#aaa':'#666';
+const BCOL=['#E24B4A','#EF9F27','#97C459','#1D9E75','#5B8FD4'];
+const BNAMES=['SDF < 8m','8–22m','22–50m','50–100m','≥ 100m'];
+const TLS=[6,16,38,85,220];
+const BLDS=[{x:155,y:125,w:78,h:30},{x:305,y:125,w:78,h:30},{x:155,y:250,w:78,h:30},{x:305,y:250,w:78,h:30}];
+let _s=42;function R(){_s=(_s*16807)%2147483647;return(_s-1)/2147483646;}
+const GS=6;let pts=[];
+for(let x=28;x<=558;x+=GS)for(let y=18;y<=402;y+=GS){
+  let ins=false;for(let b of BLDS)if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){ins=true;break;}
+  if(!ins){let sd=1e9;for(let b of BLDS){let dx=Math.max(b.x-x,0,x-b.x-b.w),dy=Math.max(b.y-y,0,y-b.y-b.h);sd=Math.min(sd,Math.sqrt(dx*dx+dy*dy));}
+  pts.push({x,y,sd,bn:sd<8?0:sd<22?1:sd<50?2:sd<100?3:4});}
+}
+function km(P,k){if(!P.length||k<1)return[];k=Math.min(k,P.length);
+let idx=new Set();while(idx.size<k)idx.add(Math.floor(R()*P.length));
+let C=[...idx].map(i=>({x:P[i].x,y:P[i].y}));
+for(let t=0;t<35;t++){let S=C.map(()=>({sx:0,sy:0,n:0}));
+P.forEach(p=>{let bi=0,bd=1e18;C.forEach((c,i)=>{let d=(p.x-c.x)**2+(p.y-c.y)**2;if(d<bd){bd=d;bi=i;}});p.ci=bi;S[bi].sx+=p.x;S[bi].sy+=p.y;S[bi].n++;});
+C.forEach((c,i)=>{if(S[i].n){c.x=S[i].sx/S[i].n;c.y=S[i].sy/S[i].n;}});}return C;}
+let ctr=[];
+for(let b=0;b<5;b++){let bp=pts.filter(p=>p.bn===b);let k=Math.max(1,Math.round(bp.length/TLS[b]));km(bp,k).forEach(c=>{c.bn=b;ctr.push(c);});}
+let bC=[0,0,0,0,0];ctr.forEach(c=>bC[c.bn]++);
+let step=0;
+const TITLES=['Step 1 — Uniform volume mesh','Step 2 — SDF exponential binning','Step 3 — K-means per bin','Step 4 — Adaptive latent grid'];
+const DESCS=[
+'4 equal-height HDB blocks in 田 pattern. All ~'+pts.length+' volume mesh points on a uniform structured grid (3.125m spacing). Wind from −Y.',
+'Each point classified by signed distance to nearest building surface. Bin widths double exponentially: near-building bins are narrow (high resolution demand), far-field bins are wide.',
+'K-means clustering runs independently within each SDF bin. Near-building bins → small target leaf size → many centroids. Far bins → large target leaf size → few centroids. Each centroid = one latent token.',
+'Bin shells (凹集) discarded. Only centroids survive as the latent grid for ViT attention. L = '+ctr.length+' tokens total. Bin 0: '+bC[0]+' | Bin 1: '+bC[1]+' | Bin 2: '+bC[2]+' | Bin 3: '+bC[3]+' | Bin 4: '+bC[4]
+];
+function drawBlds(){BLDS.forEach((b,i)=>{cx.fillStyle=BLDFILL;cx.fillRect(b.x,b.y,b.w,b.h);cx.strokeStyle=BLDSTK;cx.lineWidth=1.2;cx.strokeRect(b.x,b.y,b.w,b.h);cx.fillStyle=dk?'#ccc':'#eee';cx.font='500 11px sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText('B'+(i+1),b.x+b.w/2,b.y+b.h/2);});}
+function drawWind(){cx.save();cx.strokeStyle=dk?'#777':'#888';cx.lineWidth=1.2;cx.setLineDash([4,3]);cx.beginPath();cx.moveTo(270,400);cx.lineTo(270,375);cx.stroke();cx.setLineDash([]);cx.beginPath();cx.moveTo(265,381);cx.lineTo(270,370);cx.lineTo(275,381);cx.stroke();cx.fillStyle=TXTCOL;cx.font='11px sans-serif';cx.textAlign='center';cx.textBaseline='top';cx.fillText('wind (−Y)',270,405);cx.restore();}
+function drawLeg(){let lx=468,ly=28;cx.font='500 11px sans-serif';cx.fillStyle=dk?'#bbb':'#555';cx.textAlign='left';cx.textBaseline='top';cx.fillText('SDF bins',lx,ly);cx.font='11px sans-serif';BCOL.forEach((c,i)=>{let yy=ly+17+i*17;cx.fillStyle=c;cx.globalAlpha=step===2?0.7:0.9;cx.fillRect(lx,yy,10,10);cx.globalAlpha=1;cx.fillStyle=TXTCOL;cx.fillText(BNAMES[i],lx+15,yy);});}
+function drawStats(){let lx=455,ly=25;cx.font='500 12px sans-serif';cx.fillStyle=dk?'#ddd':'#333';cx.textAlign='left';cx.textBaseline='top';cx.fillText('L = '+ctr.length+' tokens',lx,ly);cx.font='11px sans-serif';BCOL.forEach((c,i)=>{let yy=ly+20+i*18;cx.fillStyle=c;cx.beginPath();cx.arc(lx+5,yy+5,4.5,0,Math.PI*2);cx.fill();cx.strokeStyle=dk?'rgba(255,255,255,0.4)':'rgba(0,0,0,0.25)';cx.lineWidth=0.5;cx.stroke();cx.fillStyle=TXTCOL;cx.fillText('Bin '+i+': '+bC[i]+' tokens',lx+16,yy);});}
+function draw(){
+cx.clearRect(0,0,W,H);
+cx.textAlign='left';cx.textBaseline='top';
+if(step===0){pts.forEach(p=>{cx.fillStyle=PTCOL;cx.fillRect(p.x-1.2,p.y-1.2,2.4,2.4);});}
+else if(step===1){pts.forEach(p=>{cx.fillStyle=BCOL[p.bn];cx.globalAlpha=0.55;cx.fillRect(p.x-1.5,p.y-1.5,3,3);});cx.globalAlpha=1;drawLeg();}
+else if(step===2){pts.forEach(p=>{cx.fillStyle=BCOL[p.bn];cx.globalAlpha=0.12;cx.fillRect(p.x-1,p.y-1,2,2);});cx.globalAlpha=1;
+ctr.forEach(c=>{cx.fillStyle=BCOL[c.bn];cx.beginPath();cx.arc(c.x,c.y,4,0,Math.PI*2);cx.fill();cx.strokeStyle=dk?'rgba(255,255,255,0.5)':'rgba(0,0,0,0.3)';cx.lineWidth=0.5;cx.stroke();});drawLeg();}
+else{ctr.forEach(c=>{cx.fillStyle=BCOL[c.bn];cx.beginPath();cx.arc(c.x,c.y,5,0,Math.PI*2);cx.fill();cx.strokeStyle=dk?'rgba(255,255,255,0.45)':'rgba(0,0,0,0.25)';cx.lineWidth=0.5;cx.stroke();});drawStats();}
+drawBlds();drawWind();
+document.getElementById('stitle').textContent=TITLES[step];
+document.getElementById('sdesc').textContent=DESCS[step];
+document.querySelectorAll('.sd').forEach((d,i)=>d.classList.toggle('on',i===step));
+}
+function go(d){step=Math.max(0,Math.min(3,step+d));draw();}
+let dotsEl=document.getElementById('dots');
+for(let i=0;i<4;i++){let d=document.createElement('button');d.className='sd'+(i===0?' on':'');d.onclick=(()=>{let ii=i;return()=>{step=ii;draw();}})();dotsEl.appendChild(d);}
+draw();
+</script>
