@@ -124,11 +124,4 @@ Inspected the CFD pipeline (`blockMeshDict` + `snappyHexMeshDict`):
 - Neighbor definition: kNN on centroids (k=8), then neighbors-of-neighbors for 2nd order
 - Bucketed batching: group cases by similar L for efficient GPU training
 - RoPE scale: use physical extent ratio only (remove L^{1/3} factor since L is no longer a grid proxy)
-- Weighted loss: `weight = 1 / (1 + α·SDF)` to prioritize near-building accuracy
 
----
-
-## Code & assets
-
-- [`eda_physical.py`](eda_physical.py) — 60-core EDA script (DBSCAN + regression + KDE)
-- [`sdf_binned_kmeans_tokenization.html`](https://htmlpreview.github.io/?https://github.com/3017xlin/wk7pre/blob/main/sdf_binned_kmeans_tokenization.html) — Interactive 4-step tokenization demo
